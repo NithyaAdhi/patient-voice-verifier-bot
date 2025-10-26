@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Patient Verification Voice Chatbot</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #f4f4f4;
+      }
+      h1 {
+        text-align: center;
+        color: #333;
+        padding: 20px;
+      }
+      df-messenger {
+        position: fixed;
+        bottom: 16px;
+        right: 16px;
+
+        --df-messenger-button-titlebar-color: #4285f4; 
+        --df-messenger-button-titlebar-text-color: white;
+        --df-messenger-chat-background: #f9f9f9;
+        --df-messenger-bot-message-background: #e0e0e0;
+        --df-messenger-user-message-background: #c3e6cb; 
+      }
+      
+      #custom-mic-button {
+        position: fixed;
+        bottom: 24px; 
+        right: 100px; 
+        background-color: #f44336; 
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+        z-index: 1000; 
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      }
+      #custom-mic-button:hover {
+        background-color: #d32f2f;
+      }
+      #custom-mic-button:disabled {
+          background-color: #cccccc;
+          cursor: not-allowed;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Welcome to the Patient Verification System</h1>
+    <p style="text-align: center">
+      Click the chat icon in the bottom right corner, then **click the 'Speak' button**
+      to speak your answers. Your voice input will appear in the chat box, and you can then manually send it.
+    </p>
+
+   
+    <script src="https://www.gstatic.com/dialogflow-console/fast/messenger/bootstrap.js?v=1"></script>
+    
+    <df-messenger
+      intent="WELCOME"
+      chat-title="PatientVerifierBot"
+      agent-id="a67a7efb-c37d-4e13-84d5-a077d83309bd" 
+      language-code="en"
+      expand="true" 
+
+    ></df-messenger>
+
+    
+    <button id="custom-mic-button">Speak</button>
+
+    
+    <script>
+      window.addEventListener("load", () => {
+        const dfMessenger = document.querySelector('df-messenger');
+        const customMicButton = document.getElementById('custom-mic-button');
+
+        if (!dfMessenger) {
+            console.error("df-messenger component not found in DOM.");
+            if (customMicButton) customMicButton.disabled = true;
+            return;
+        }
+        if (!customMicButton) {
+            console.error("Custom mic button not found in DOM.");
+            return;
+        }
+
+       
+        if (!('webkitSpeechRecognition' in window)) {
+            console.error("Web Speech API (webkitSpeechRecognition) not supported in this browser.");
+            customMicButton.textContent = 'Voice Not Supported';
+            customMicButton.disabled = true;
+            alert("Your browser does not support Web Speech Recognition. Please try Chrome on a desktop device.");
+            return;
+        }
+
+        const recognition = new webkitSpeechRecognition();
+        recognition.continuous = false; 
+        recognition.interimResults = false; 
+        recognition.lang = dfMessenger.getAttribute('language-code') || 'en-US'; 
+
+        recognition.onstart = function() {
+            customMicButton.textContent = 'Listening...';
+            customMicButton.style.backgroundColor = '#4CAF50'; 
+            customMicButton.disabled = true; 
+            console.log('Speech recognition started.');
+        };
+
+        recognition.onresult = function(event) {
+            const transcript = event.results[0][0].transcript;
+            console.log('User said:', transcript); 
+            
+            try {
+                
+                
+                const findInputElementDeep = (root) => {
+                    let queue = [root];
+                    let current;
+                    while (queue.length > 0) {
+                        current = queue.shift();
+                        if (current && current.shadowRoot) {
+                            
+                            let found = current.shadowRoot.querySelector('input[type="text"]') ||
+                                        current.shadowRoot.querySelector('textarea') ||
+                                        current.shadowRoot.querySelector('.input-field') ||
+                                        current.shadowRoot.querySelector('#queryInput');
+                            
+                            
+                            if (found && found.tagName.toLowerCase() === 'paper-input') {
+                                return found.shadowRoot ? found.shadowRoot.querySelector('input') : found.querySelector('input');
+                            }
+                            if (found) return found;
+
+                            
+                            Array.from(current.shadowRoot.children).forEach(child => queue.push(child));
+                        } else if (current) {
+                            
+                             let found = current.querySelector('input[type="text"]') ||
+                                        current.querySelector('textarea') ||
+                                        current.querySelector('.input-field') ||
+                                        current.querySelector('#queryInput');
+                            if (found) return found;
+                            Array.from(current.children).forEach(child => queue.push(child));
+                        }
+                    }
+                    return null;
+                };
+
+                let inputElement = findInputElementDeep(dfMessenger);
+                
+                if (inputElement) {
+                    
+                    
+                  
+                    if (inputElement.contentEditable === 'true') {
+                        inputElement.textContent = transcript;
+                    } else {
+                        inputElement.value = transcript;
+                    }
+
+                    
+                    inputElement.dispatchEvent(new Event('input', { bubbles: true }));
+                    inputElement.dispatchEvent(new Event('change', { bubbles: true }));
+                    
+
+                    console.log("Successfully pasted voice input into chat box. Please press Enter or click Send.");
+                    inputElement.focus(); 
+                } else {
+                    console.error("Could not find df-messenger's internal input field. Voice input failed to paste.");
+                    alert("Failed to paste voice input: Chat input field not found. Please try typing. (See console for debug details)");
+                }
+            } catch (e) {
+                console.error("Error pasting voice input:", e);
+                alert("An error occurred while pasting voice input: " + e.message + ". Please try typing.");
+            }
+        };
+
+       
+        recognition.onerror = function(event) {
+            console.error('Speech recognition error:', event.error);
+          
+            alert("Speech recognition error: " + event.error + ". Please ensure microphone permissions are granted and try again.");
+            customMicButton.textContent = 'Speak (Error)';
+            customMicButton.style.backgroundColor = '#f44336';
+            customMicButton.disabled = false; 
+        };
+
+        recognition.onend = function() {
+            customMicButton.textContent = 'Speak';
+            customMicButton.style.backgroundColor = '#f44336'; 
+            customMicButton.disabled = false; 
+            console.log('Speech recognition ended.');
+        };
+       
+
+        customMicButton.addEventListener('click', () => {
+            console.log("Custom mic button clicked. Starting speech recognition.");
+            dfMessenger.setAttribute('open', 'true'); 
+            recognition.start(); 
+        });
+
+        
+        dfMessenger.addEventListener('df-ready', () => {
+            console.log('df-messenger is ready');
+            dfMessenger.setAttribute('open', 'true'); 
+        });
+      });
+    </script>
+  </body>
+</html>
